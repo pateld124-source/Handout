@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import '@/styles/globals.css';
 import { Providers } from './providers';
+import { Analytics } from '@vercel/analytics/next';
 
 export const metadata: Metadata = {
   title: 'Handout — your campus, sorted',
@@ -12,6 +13,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     <html lang="en">
       <body className="bg-pattern">
         <Providers>{children}</Providers>
+        <Analytics />
       </body>
     </html>
   );
