@@ -16,8 +16,15 @@ Merge to `main`; Vercel deploys. The code works with the old database too, with 
 step 3: message notifications are not created, and the age/photo rules are only enforced in the app.
 
 ## 3. Run the database hardening
-Supabase → SQL Editor → paste `db/security-hardening.sql` → Run. Safe to re-run.
-Run it LAST: after any other `db/*.sql` or `supabase/migrations/*.sql` file you ever re-run.
+**Live project:** Supabase → SQL Editor → paste `db/live-hardening.sql` → Run. Safe to re-run.
+It keeps the live signup behaviour (owner admin, student profile, welcome notifications, the beta
+.edu switch) and only clamps the signup role, so nobody can sign up as `admin`. To undo, run
+`db/live-hardening-undo.sql`.
+
+**Do not run `db/security-hardening.sql` on the live project.** It is for fresh installs: it replaces
+`handle_new_user`, `enforce_edu_email` and `notify_on_message` with simpler versions (no welcome
+notifications or student profile, the .edu rule switched on, owner-admin lost) and limits
+`listing-media` to 8 MB photos (the app allows a 20 MB video).
 
 On the live project `public_profiles` is a TABLE kept in sync by a trigger, with foreign keys from
 other tables pointing at it. The script keeps that table and locks it down (read-only for the API,

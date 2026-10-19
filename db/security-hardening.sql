@@ -1,5 +1,7 @@
 -- ════════════════════════════════════════════════════════════════════════
--- SECURITY HARDENING — run in Supabase → SQL Editor. Safe to re-run.
+-- SECURITY HARDENING — FRESH INSTALLS ONLY. On the live project run db/live-hardening.sql
+-- instead: this file replaces handle_new_user / enforce_edu_email / notify_on_message with
+-- simpler versions and limits listing-media to 8 MB photos. Safe to re-run on a fresh database.
 --
 -- Run order: LAST — after db/schema.sql, every other db/*.sql file and
 -- supabase/migrations/*.sql. Re-run it after re-running any other db/ or
