@@ -13,7 +13,7 @@ interface ScrollRevealProps {
   once?: boolean;
   className?: string;
   style?: CSSProperties;
-  as?: keyof JSX.IntrinsicElements;
+  as?: keyof React.JSX.IntrinsicElements;
 }
 
 const hiddenTransforms: Record<RevealDirection, string> = {

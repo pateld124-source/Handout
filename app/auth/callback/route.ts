@@ -28,7 +28,7 @@ export async function GET(request: Request) {
 
   // ── Email confirmation / password recovery (token_hash + type) ──────────
   if (tokenHash && otpType) {
-    const supabase = createClient();
+    const supabase = await createClient();
     const { data, error } = await supabase.auth.verifyOtp({ token_hash: tokenHash, type: otpType });
 
     if (!error && data.session) {
@@ -45,7 +45,7 @@ export async function GET(request: Request) {
   }
 
   if (code) {
-    const supabase = createClient();
+    const supabase = await createClient();
     const { data, error } = await supabase.auth.exchangeCodeForSession(code);
 
     if (!error && data.session) {
@@ -105,7 +105,7 @@ export async function GET(request: Request) {
 
 // Where a freshly-authenticated user belongs, based on their role. Shared by the
 // token_hash (email confirmation) and PKCE code paths.
-async function destForUser(supabase: ReturnType<typeof createClient>, roleParam: string | null) {
+async function destForUser(supabase: Awaited<ReturnType<typeof createClient>>, roleParam: string | null) {
   let role = 'student', status = 'unsubmitted';
   try {
     const { data: { user } } = await supabase.auth.getUser();

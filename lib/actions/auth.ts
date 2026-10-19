@@ -28,7 +28,7 @@ function rateLimit(key: string, max: number, windowMs: number): { allowed: boole
 }
 
 async function getClientKey() {
-  const h = headers();
+  const h = await headers();
   return h.get('x-forwarded-for') ?? h.get('x-real-ip') ?? 'unknown';
 }
 
@@ -96,7 +96,7 @@ export async function signUpAction(formData: FormData): Promise<ActionResult> {
   if (!parsed.success) return { error: parsed.error.errors[0].message };
 
   // 3. Call Supabase
-  const supabase = createClient();
+  const supabase = await createClient();
   const { data, error } = await supabase.auth.signUp({
     email: parsed.data.email,
     password: parsed.data.password,
@@ -132,7 +132,7 @@ export async function signInAction(formData: FormData): Promise<ActionResult> {
   const parsed = SignInSchema.safeParse(raw);
   if (!parsed.success) return { error: parsed.error.errors[0].message };
 
-  const supabase = createClient();
+  const supabase = await createClient();
   const { data, error } = await supabase.auth.signInWithPassword({
     email: parsed.data.email,
     password: parsed.data.password,
@@ -160,14 +160,14 @@ export async function signInAction(formData: FormData): Promise<ActionResult> {
 }
 
 export async function signOutAction() {
-  const supabase = createClient();
+  const supabase = await createClient();
   await supabase.auth.signOut();
   revalidatePath('/', 'layout');
   redirect('/auth/login');
 }
 
 export async function saveOnboardingAction(formData: FormData): Promise<ActionResult> {
-  const supabase = createClient();
+  const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) redirect('/auth/login');
 
@@ -210,7 +210,7 @@ const MessageSchema = z.object({
 });
 
 export async function sendMessageAction(formData: FormData): Promise<ActionResult> {
-  const supabase = createClient();
+  const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return { error: 'Not authenticated' };
 
@@ -242,7 +242,7 @@ const CommunityPostSchema = z.object({
 });
 
 export async function createCommunityPostAction(formData: FormData): Promise<ActionResult> {
-  const supabase = createClient();
+  const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return { error: 'Not authenticated' };
 

@@ -24,7 +24,7 @@ async function listObjectPaths(serviceClient: SupabaseClient, bucket: string, pr
 
 export async function deleteAccountAction(): Promise<ActionResult> {
   try {
-    const supabase = createClient();
+    const supabase = await createClient();
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return { error: 'Not authenticated' };
 

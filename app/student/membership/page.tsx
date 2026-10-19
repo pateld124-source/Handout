@@ -72,7 +72,7 @@ const plans = [
 const BRICOLAGE = "'Bricolage Grotesque', sans-serif";
 
 export default async function MembershipPage() {
-  const supabase = createClient();
+  const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   const { data: userData } = await supabase.from('users').select('plan').eq('id', user?.id ?? '').single();
   const currentPlan = userData?.plan ?? 'free';

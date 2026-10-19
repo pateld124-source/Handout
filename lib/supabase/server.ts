@@ -6,8 +6,8 @@ import { cookies } from 'next/headers';
 // added in 0.4.0). With getAll/setAll, 0.3.0 reads no cookie, so getUser()
 // always returns null and every protected route redirects to login. These
 // get/set/remove handlers are what this version understands.
-export function createClient() {
-  const cookieStore = cookies();
+export async function createClient() {
+  const cookieStore = await cookies();
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
   if (!url || !key) {
@@ -37,13 +37,13 @@ export function createClient() {
 
 export async function getUser() {
   if (!process.env.NEXT_PUBLIC_SUPABASE_URL) return null;
-  const supabase = createClient();
+  const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   return user;
 }
 
 export async function getUserProfile() {
-  const supabase = createClient();
+  const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return null;
   const { data } = await supabase.from('users').select('*').eq('id', user.id).single();
