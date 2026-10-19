@@ -6,7 +6,7 @@ export function validateName(v: string): string {
   if (!t) return 'Full name is required';
   if (t.length < 2) return 'At least 2 characters';
   if (t.length > 60) return 'Name is too long';
-  if (!/^[A-Za-z][A-Za-z\s.'-]*$/.test(t)) return "Letters, spaces, . - ' only";
+  if (!/^\p{L}[\p{L}\p{M}\s.'’-]*$/u.test(t)) return "Letters, spaces, . - ' only";
   return '';
 }
 export function validateEmail(v: string): string {
@@ -30,7 +30,10 @@ export function validateEduEmail(v: string): string {
   if (REQUIRE_EDU_EMAIL && !/\.edu$/i.test(v.trim())) return 'Students must use a .edu university email address';
   return '';
 }
-export function normalizePhone(v: string): string { return v.replace(/\D/g, '').slice(0, 10); }
+export function normalizePhone(v: string): string {
+  const d = v.replace(/\D/g, '');
+  return (d.length === 11 && d[0] === '1' ? d.slice(1) : d).slice(0, 10);
+}
 export function formatPhone(v: string): string {
   const d = normalizePhone(v);
   if (d.length <= 3) return d;

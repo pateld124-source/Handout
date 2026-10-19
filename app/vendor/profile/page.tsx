@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { VendorShell } from '@/components/layout/VendorShell';
 import { createClient } from '@/lib/supabase/client';
+import { prepareImageUpload } from '@/lib/imageCompress';
 import { validateName } from '@/lib/validation';
 import { PhoneOTPVerify } from '@/components/ui/PhoneOTPVerify';
 
@@ -92,12 +93,13 @@ export default function VendorProfile() {
     if (!file) return;
     if (file.size > 5 * 1024 * 1024) { setErr('Image must be under 5 MB'); return; }
     setUploading(true); setErr('');
+    const jpeg = await prepareImageUpload(file).catch((e: Error) => { setErr(e.message); return null; });
+    if (!jpeg) { setUploading(false); return; }
     const supabase = createClient();
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) { setUploading(false); return; }
-    const ext = file.name.split('.').pop();
-    const path = `${user.id}/avatar.${ext}`;
-    const { error: upErr } = await supabase.storage.from('avatars').upload(path, file, { upsert: true });
+    const path = `${user.id}/avatar.jpg`;
+    const { error: upErr } = await supabase.storage.from('avatars').upload(path, jpeg, { upsert: true });
     if (upErr) { setErr('Upload failed: ' + upErr.message); setUploading(false); return; }
     const { data: { publicUrl } } = supabase.storage.from('avatars').getPublicUrl(path);
     const urlWithBust = `${publicUrl}?t=${Date.now()}`;

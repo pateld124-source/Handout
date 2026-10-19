@@ -4,6 +4,8 @@ import { useEffect, useRef, useState } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { sendMessageAction } from '@/lib/actions/auth';
 import { awardPoints } from '@/lib/points';
+import { publicStorageUrl } from '@/lib/storageUrl';
+import { prepareImageUpload } from '@/lib/imageCompress';
 
 /* ── MessagesUI icon set ── */
 const SvcMsgIcon  = () => <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg>;
@@ -93,15 +95,18 @@ function MessageContent({ content, mine }: { content: string; mine: boolean }) {
   const imgPattern = /\[📎 ([^\]]+\.(png|jpg|jpeg|gif|webp))\]\(([^)]+)\)/i;
   const filePattern = /\[📎 ([^\]]+)\]\(([^)]+)\)/;
   const simplePattern = /\[📎 ([^\]]+)\]/;
+  const plain = <span style={{ wordBreak: 'break-word' }}>{content}</span>;
 
   const imgMatch = content.match(imgPattern);
   if (imgMatch) {
     const [full, name, , url] = imgMatch;
+    const src = publicStorageUrl(url, 'message-attachments');
+    if (!src) return plain;
     const pre = content.slice(0, content.indexOf(full)).trim();
     return (
       <div>
         {pre && <p style={{ margin: '0 0 8px', wordBreak: 'break-word' }}>{pre}</p>}
-        <img src={url} alt={name} style={{ maxWidth: '100%', maxHeight: 200, borderRadius: 8, display: 'block' }} />
+        <img src={src} alt={name} style={{ maxWidth: '100%', maxHeight: 200, borderRadius: 8, display: 'block' }} />
         <div style={{ fontSize: 11, marginTop: 4, opacity: 0.65 }}>📎 {name}</div>
       </div>
     );
@@ -110,11 +115,13 @@ function MessageContent({ content, mine }: { content: string; mine: boolean }) {
   const fileMatch = content.match(filePattern);
   if (fileMatch) {
     const [full, name, url] = fileMatch;
+    const href = publicStorageUrl(url, 'message-attachments');
+    if (!href) return plain;
     const pre = content.slice(0, content.indexOf(full)).trim();
     return (
       <div>
         {pre && <p style={{ margin: '0 0 8px', wordBreak: 'break-word' }}>{pre}</p>}
-        <a href={url} target="_blank" rel="noreferrer" style={{
+        <a href={href} target="_blank" rel="noopener noreferrer" style={{
           display: 'inline-flex', alignItems: 'center', gap: 6,
           padding: '7px 11px', borderRadius: 8,
           background: mine ? 'rgba(0,0,0,0.15)' : 'rgba(18,36,28,0.09)',
@@ -141,7 +148,7 @@ function MessageContent({ content, mine }: { content: string; mine: boolean }) {
     );
   }
 
-  return <span style={{ wordBreak: 'break-word' }}>{content}</span>;
+  return plain;
 }
 
 /* ══════════════════════════════════════════════════════════════
@@ -585,23 +592,29 @@ export function MessagesUI({ meId }: { meId: string }) {
 
     if (pendingFile) {
       setUploading(true);
+      let file = pendingFile;
+      // Photos are re-encoded to strip EXIF/GPS; GIFs stay as-is so they keep animating.
+      if (file.type.startsWith('image/') && file.type !== 'image/gif') {
+        try { file = await prepareImageUpload(file); }
+        catch (e) { setUploading(false); alert((e as Error).message); return; }
+      }
       try {
         const supabase = createClient();
-        const ext = pendingFile.name.split('.').pop() || 'bin';
+        const ext = file.name.split('.').pop() || 'bin';
         const path = `${meId}/${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
         const { data: upData, error: upErr } = await supabase.storage
           .from('message-attachments')
-          .upload(path, pendingFile, { upsert: false });
+          .upload(path, file, { upsert: false });
         if (!upErr && upData) {
           const { data: urlData } = supabase.storage.from('message-attachments').getPublicUrl(path);
-          const tag = `[📎 ${pendingFile.name}](${urlData.publicUrl})`;
+          const tag = `[📎 ${file.name}](${urlData.publicUrl})`;
           content = content ? `${content}\n${tag}` : tag;
         } else {
-          const tag = `[📎 ${pendingFile.name}]`;
+          const tag = `[📎 ${file.name}]`;
           content = content ? `${content}\n${tag}` : tag;
         }
       } catch {
-        const tag = `[📎 ${pendingFile.name}]`;
+        const tag = `[📎 ${file.name}]`;
         content = content ? `${content}\n${tag}` : tag;
       }
       setUploading(false);

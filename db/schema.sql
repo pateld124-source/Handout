@@ -3,7 +3,8 @@
 -- Run this in Supabase → SQL Editor. Drops + recreates everything cleanly.
 -- Includes: all tables, roommate preference fields, ID-verification table,
 -- the is_admin() helper, signup trigger, and full Row Level Security.
--- After this, run:  db/storage-setup.sql  and  db/make-admin.sql
+-- After this, run:  db/storage-setup.sql  and  db/make-admin.sql, then the
+-- other db/*.sql files, and db/security-hardening.sql LAST.
 -- ════════════════════════════════════════════════════════════════════════
 
 DROP TRIGGER IF EXISTS on_auth_user_created ON auth.users;
@@ -154,7 +155,7 @@ CREATE TABLE public.verifications (
   notes TEXT,
   submitted_at TIMESTAMPTZ DEFAULT NOW(),
   reviewed_at TIMESTAMPTZ,
-  reviewed_by UUID REFERENCES public.users(id)
+  reviewed_by UUID REFERENCES public.users(id) ON DELETE SET NULL
 );
 
 -- ── admin check (SECURITY DEFINER avoids RLS recursion) ───────────────────
@@ -177,12 +178,51 @@ BEGIN
   VALUES (
     NEW.id, NEW.email,
     COALESCE(NEW.raw_user_meta_data->>'full_name', split_part(NEW.email,'@',1)),
-    COALESCE((NEW.raw_user_meta_data->>'role')::user_role, 'student')
+    -- signup metadata can never grant admin
+    CASE WHEN NEW.raw_user_meta_data->>'role' IN ('vendor', 'provider')
+         THEN (NEW.raw_user_meta_data->>'role')::user_role
+         ELSE 'student'::user_role END
   ) ON CONFLICT (id) DO NOTHING;
   RETURN NEW;
 END; $$;
 CREATE TRIGGER on_auth_user_created AFTER INSERT ON auth.users
   FOR EACH ROW EXECUTE PROCEDURE public.handle_new_user();
+
+-- ── members edit only their own profile columns ───────────────────────────
+REVOKE INSERT, UPDATE ON public.users FROM PUBLIC, anon, authenticated;
+GRANT UPDATE (full_name, phone, avatar_url, gender, city, address, onboarded, country, country_code, state, zip,
+              role, verification_status, is_verified) ON public.users TO authenticated;
+GRANT INSERT (id, email, full_name, role) ON public.users TO authenticated;
+
+-- members: student/provider → vendor and → 'pending' only; admins and server-side code: anything
+CREATE OR REPLACE FUNCTION public.users_guard_transitions()
+RETURNS TRIGGER LANGUAGE plpgsql SET search_path = public AS $$
+BEGIN
+  IF NEW.role IS NOT DISTINCT FROM OLD.role
+     AND NEW.verification_status IS NOT DISTINCT FROM OLD.verification_status
+     AND NEW.is_verified IS NOT DISTINCT FROM OLD.is_verified THEN
+    RETURN NEW;
+  END IF;
+  -- service role, SQL editor and SECURITY DEFINER functions are trusted
+  IF current_user NOT IN ('authenticated', 'anon') OR public.is_admin() THEN
+    RETURN NEW;
+  END IF;
+  IF NEW.role IS DISTINCT FROM OLD.role
+     AND NOT (OLD.role::text IN ('student', 'provider') AND NEW.role::text = 'vendor') THEN
+    RAISE EXCEPTION 'Only an admin can make this role change.' USING ERRCODE = 'insufficient_privilege';
+  END IF;
+  IF NEW.verification_status IS DISTINCT FROM OLD.verification_status
+     AND NEW.verification_status IS DISTINCT FROM 'pending' THEN
+    RAISE EXCEPTION 'Only an admin can change the verification status.' USING ERRCODE = 'insufficient_privilege';
+  END IF;
+  IF NEW.is_verified IS DISTINCT FROM OLD.is_verified THEN
+    RAISE EXCEPTION 'Only an admin can change the verified badge.' USING ERRCODE = 'insufficient_privilege';
+  END IF;
+  RETURN NEW;
+END;
+$$;
+CREATE TRIGGER users_guard_transitions BEFORE UPDATE ON public.users
+  FOR EACH ROW EXECUTE PROCEDURE public.users_guard_transitions();
 
 -- ═══════════════════════ ROW LEVEL SECURITY ══════════════════════════════
 ALTER TABLE public.users             ENABLE ROW LEVEL SECURITY;
@@ -198,11 +238,11 @@ ALTER TABLE public.reviews           ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.notifications     ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.verifications     ENABLE ROW LEVEL SECURITY;
 
--- users: readable by signed-in users (names for listings); write own row; admin all; self-delete
-CREATE POLICY users_read       ON public.users FOR SELECT TO authenticated USING (true);
-CREATE POLICY users_insert     ON public.users FOR INSERT WITH CHECK (auth.uid() = id);
-CREATE POLICY users_update_own ON public.users FOR UPDATE USING (auth.uid() = id);
-CREATE POLICY users_delete_own ON public.users FOR DELETE USING (auth.uid() = id);
+-- users: own row only (others via public_profiles); write own row; admin all. No self-delete (runs server-side).
+CREATE POLICY users_read       ON public.users FOR SELECT TO authenticated USING (auth.uid() = id OR public.is_admin());
+CREATE POLICY users_insert     ON public.users FOR INSERT TO authenticated
+  WITH CHECK (auth.uid() = id AND role::text IN ('student', 'vendor', 'provider') AND lower(email) = lower(auth.jwt() ->> 'email'));
+CREATE POLICY users_update_own ON public.users FOR UPDATE TO authenticated USING (auth.uid() = id) WITH CHECK (auth.uid() = id);
 CREATE POLICY users_admin_all  ON public.users FOR ALL USING (public.is_admin()) WITH CHECK (public.is_admin());
 
 -- profiles
@@ -238,16 +278,22 @@ CREATE POLICY rev_read  ON public.reviews FOR SELECT TO authenticated USING (tru
 CREATE POLICY rev_write ON public.reviews FOR INSERT WITH CHECK (auth.uid() = reviewer_id);
 CREATE POLICY ntf_own   ON public.notifications FOR ALL USING (auth.uid() = user_id) WITH CHECK (auth.uid() = user_id);
 
--- verifications: ONLY the owner and admins can see/manage. No general read.
+-- verifications: ONLY the owner and admins can see/manage. No general read. Owners (re)submit as 'pending' only.
 CREATE POLICY ver_owner_read   ON public.verifications FOR SELECT USING (auth.uid() = user_id);
-CREATE POLICY ver_owner_write  ON public.verifications FOR INSERT WITH CHECK (auth.uid() = user_id);
-CREATE POLICY ver_owner_update ON public.verifications FOR UPDATE USING (auth.uid() = user_id) WITH CHECK (auth.uid() = user_id);
+CREATE POLICY ver_owner_write  ON public.verifications FOR INSERT WITH CHECK (auth.uid() = user_id AND status = 'pending');
+CREATE POLICY ver_owner_update ON public.verifications FOR UPDATE USING (auth.uid() = user_id) WITH CHECK (auth.uid() = user_id AND status = 'pending');
 CREATE POLICY ver_admin_all    ON public.verifications FOR ALL USING (public.is_admin()) WITH CHECK (public.is_admin());
 
 SELECT '✅ Handout final schema ready — 12 tables, RLS on, is_admin() + signup trigger.' AS status;
 
 
--- Safe public poster names (id + name + join date only)
-CREATE OR REPLACE VIEW public.public_profiles AS
-  SELECT id, full_name, created_at FROM public.users;
+-- Safe public profile fields (city/state only for signed-in callers). Read-only: view writes skip RLS.
+DROP VIEW IF EXISTS public.public_profiles;
+CREATE VIEW public.public_profiles AS
+  SELECT id, full_name, avatar_url, role, is_verified,
+         CASE WHEN auth.uid() IS NOT NULL THEN city END AS city,
+         CASE WHEN auth.uid() IS NOT NULL THEN state END AS state,
+         created_at
+  FROM public.users;
+REVOKE ALL ON public.public_profiles FROM PUBLIC, anon, authenticated;
 GRANT SELECT ON public.public_profiles TO anon, authenticated;

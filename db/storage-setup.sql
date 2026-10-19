@@ -15,8 +15,11 @@ DO $$ BEGIN
   BEGIN CREATE POLICY "listing media read" ON storage.objects
     FOR SELECT USING (bucket_id = 'listing-media');
   EXCEPTION WHEN OTHERS THEN RAISE NOTICE 'lm read skipped: %', SQLERRM; END;
-  BEGIN CREATE POLICY "listing media upload" ON storage.objects
-    FOR INSERT TO authenticated WITH CHECK (bucket_id = 'listing-media');
+  -- a user can upload only into their OWN folder ( <uid>/... )
+  BEGIN DROP POLICY IF EXISTS "listing media upload" ON storage.objects;
+    CREATE POLICY "listing media upload" ON storage.objects
+    FOR INSERT TO authenticated
+    WITH CHECK (bucket_id = 'listing-media' AND (storage.foldername(name))[1] = auth.uid()::text);
   EXCEPTION WHEN OTHERS THEN RAISE NOTICE 'lm upload skipped: %', SQLERRM; END;
 END $$;
 

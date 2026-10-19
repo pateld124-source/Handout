@@ -35,8 +35,9 @@ export function FeedbackButton() {
       });
       if (error) throw error;
       setSent(true);
-    } catch (e: any) {
-      setErr(e?.message?.includes('feedback') ? 'Feedback isn’t enabled yet (run db/beta-mode.sql).' : (e?.message || 'Could not send — try again.'));
+    } catch (e) {
+      console.error('Feedback submit failed:', e);
+      setErr('Could not send — try again.');
     }
     setBusy(false);
   }

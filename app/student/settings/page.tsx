@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { StudentLayout } from '@/components/layout/StudentLayout';
 import { createClient } from '@/lib/supabase/client';
+import { deleteAccountAction } from '@/lib/actions/account';
 import { BetaBadge } from '@/components/beta/BetaBadge';
 
 const S = {
@@ -102,15 +103,13 @@ export default function StudentSettingsPage() {
     setTimeout(() => setPwOk(false), 3000);
   }
 
+  const [deleting, setDeleting] = useState(false);
+
   async function deleteAccount() {
     if (!confirm('Delete your account permanently? This cannot be undone.')) return;
-    const sb = createClient();
-    const { data: { user } } = await sb.auth.getUser();
-    if (!user) return;
-    await sb.from('roommate_listings').delete().eq('user_id', user.id);
-    await sb.from('student_profiles').delete().eq('user_id', user.id);
-    await sb.from('users').delete().eq('id', user.id);
-    await sb.auth.signOut();
+    setDeleting(true);
+    const res = await deleteAccountAction();
+    if (res.error) { setDeleting(false); alert(res.error); return; }
     window.location.href = '/';
   }
 
@@ -208,8 +207,9 @@ export default function StudentSettingsPage() {
           </p>
           <button
             onClick={deleteAccount}
+            disabled={deleting}
             style={{ height: 42, padding: '0 20px', background: 'rgba(220,38,38,0.12)', color: '#C25B4E', border: '1px solid rgba(220,38,38,0.3)', borderRadius: 100, fontWeight: 700, fontSize: 13, cursor: 'pointer' }}>
-            Delete my account
+            {deleting ? 'Deleting…' : 'Delete my account'}
           </button>
         </div>
       </div>

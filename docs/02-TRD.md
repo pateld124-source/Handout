@@ -55,7 +55,7 @@ docs/                      # these documents
 
 ## 2.4 Authentication & roles
 - Email + password via Supabase Auth.
-- On signup, a Postgres trigger (`handle_new_user`) inserts a matching `public.users` row with the role from sign-up metadata (default `student`).
+- On signup, a Postgres trigger (`handle_new_user`) inserts a matching `public.users` row with the role from sign-up metadata (`student`, `vendor` or `provider`; anything else becomes `student`).
 - After plain login, the app reads the role and redirects to `/student/dashboard`, `/vendor/dashboard`, or `/admin/users`.
 - **Admin** is reachable only by logging in as an admin account; admin links are not shown to students, and every admin page runs an admin check.
 
@@ -64,16 +64,17 @@ docs/                      # these documents
 - **Storage bucket `listing-media`** (public read, authenticated upload) holds roommate photos/videos. URLs are stored in `roommate_listings.media` (JSONB array of `{url, type}`).
 
 ## 2.6 Validation rules (current)
-- **Phone:** digits only, hard-capped at **10**.
+- **Phone:** digits only; US numbers are 10 digits (a pasted leading `+1` is dropped), international numbers (`PhoneInput`) up to 14 digits.
 - **Listings:** title length, required location, prices must be positive numbers, description minimums.
-- **Auth:** email format, password strength, name checks (`lib/validation.ts`).
+- **Auth:** email format, password strength, name checks (`lib/validation.ts`; names may use any alphabet).
 
 ## 2.7 Security (RLS summary)
 - Row Level Security ON for all tables.
-- `users`: anyone signed-in can read; you can only insert/update **your own** row.
+- `users`: you can read and update only **your own** row, and only your profile columns; role and verification changes are admin-only (except student/provider → vendor and submitting for review). Other members' public fields come from the read-only `public_profiles` view.
 - Listings: signed-in read; owner-only write.
-- `bookings` / `messages`: visible only to the parties involved.
-- Storage: public read of media; only authenticated users can upload.
+- `bookings` / `messages`: visible only to the parties involved; blocked users can't message each other.
+- Storage: public read of media; uploads only into your own `<user id>/` folder; ID documents readable only by their owner and admins.
+- `db/security-hardening.sql` applies these rules (run it last); `db/tests/run.sh` tests them against a throwaway local Postgres.
 
 ## 2.8 Non-functional requirements
 - **Reliability:** complete file replacements over partial patches during the build; every delivery is testable by running `npm run dev`.
@@ -85,7 +86,9 @@ docs/                      # these documents
 ```
 NEXT_PUBLIC_SUPABASE_URL=...
 NEXT_PUBLIC_SUPABASE_ANON_KEY=...
+SUPABASE_SERVICE_ROLE_KEY=...   # server-only; needed for account deletion
 ```
+E2E test accounts come from `E2E_*` variables (see `.env.example`).
 Active Supabase project: `zidxnwtolbluisgucrzs`. Never commit secrets.
 
 ## 2.10 Planned integrations

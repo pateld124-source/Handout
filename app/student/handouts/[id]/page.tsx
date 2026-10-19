@@ -5,6 +5,7 @@ import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { createClient } from '@/lib/supabase/client';
 import { StudentLayout } from '@/components/layout/StudentLayout';
+import { publicStorageUrl } from '@/lib/storageUrl';
 
 /* ── Icons ── */
 const BackIcon    = () => <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="15 18 9 12 15 6"/></svg>;
@@ -161,6 +162,7 @@ export default function HandoutDetailPage() {
   const avgRating = reviews.length > 0 ? reviews.reduce((s, r) => s + r.rating, 0) / reviews.length : 0;
   const isPdf = handout.file_type?.includes('pdf') || handout.file_url?.endsWith('.pdf');
   const isImage = handout.file_type?.includes('image');
+  const fileUrl = publicStorageUrl(handout.file_url, 'handouts');
   const color = fileColor(handout.file_type);
   const isOwn = me && handout.user_id === me.id;
   const uploaderName = uploader?.full_name || 'Student';
@@ -180,10 +182,10 @@ export default function HandoutDetailPage() {
 
             {/* Preview */}
             <div style={{ ...card, overflow: 'hidden', minHeight: 340, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(18,36,28,0.04)' }}>
-              {isImage && handout.file_url ? (
-                <img src={handout.file_url} alt={handout.title} style={{ maxWidth: '100%', maxHeight: 420, objectFit: 'contain', display: 'block' }} />
-              ) : isPdf && handout.file_url ? (
-                <iframe src={handout.file_url} style={{ width: '100%', height: 440, border: 'none', display: 'block' }} title={handout.title} />
+              {isImage && fileUrl ? (
+                <img src={fileUrl} alt={handout.title} style={{ maxWidth: '100%', maxHeight: 420, objectFit: 'contain', display: 'block' }} />
+              ) : isPdf && fileUrl ? (
+                <iframe src={fileUrl} style={{ width: '100%', height: 440, border: 'none', display: 'block' }} title={handout.title} />
               ) : (
                 <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 16, padding: 40, color: color }}>
                   <FileDocIcon />
@@ -297,13 +299,13 @@ export default function HandoutDetailPage() {
             <div style={{ ...card, padding: '20px 22px' }}>
               <p style={{ margin: '0 0 16px', fontSize: 11, fontWeight: 800, color: '#7d9188', textTransform: 'uppercase', letterSpacing: 1 }}>Actions</p>
 
-              {handout.file_url ? (
+              {fileUrl ? (
                 <>
-                  <a href={handout.file_url} target="_blank" rel="noreferrer"
+                  <a href={fileUrl} target="_blank" rel="noopener noreferrer"
                     style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, height: 46, borderRadius: 12, background: '#12A150', color: '#ffffff', fontWeight: 800, fontSize: 14, textDecoration: 'none', marginBottom: 10 }}>
                     <EyeIcon /> Preview
                   </a>
-                  <a href={handout.file_url} download
+                  <a href={fileUrl} download
                     style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, height: 46, borderRadius: 12, border: '1px solid rgba(18,36,28,0.12)', background: 'rgba(18,36,28,0.04)', color: '#12241C', fontWeight: 700, fontSize: 14, textDecoration: 'none' }}>
                     <DownloadIcon /> Download
                   </a>

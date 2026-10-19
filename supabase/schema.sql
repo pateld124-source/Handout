@@ -9,3 +9,4 @@
 --   4. Run db/notifications-triggers.sql
 --   5. Run db/public-read-policies.sql
 --   6. Run db/admin-and-delete-policies.sql
+--   7. Run db/security-hardening.sql last

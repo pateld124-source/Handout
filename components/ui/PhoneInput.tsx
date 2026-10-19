@@ -1,5 +1,6 @@
 'use client';
 import { useState, useRef, useEffect } from 'react';
+import { normalizeIntl } from '@/lib/validation';
 
 const COUNTRIES = [
   { code: 'US', dial: '+1',   flag: '🇺🇸', name: 'United States' },
@@ -130,10 +131,10 @@ export function PhoneInput({ value, onChange, disabled }: Props) {
         <input
           type="tel"
           value={number}
-          onChange={e => update(country, e.target.value.replace(/\D/g, '').slice(0, 10))}
+          onChange={e => update(country, normalizeIntl(e.target.value))}
           disabled={disabled}
           placeholder="5551234567"
-          maxLength={10}
+          maxLength={14}
           style={{
             flex: 1,
             background: 'transparent',

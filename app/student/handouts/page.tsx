@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { StudentLayout } from '@/components/layout/StudentLayout';
 import { validateText, validateParagraph } from '@/lib/validation';
+import { publicStorageUrl } from '@/lib/storageUrl';
 
 /* ── SVG file type icons ── */
 const PdfIcon   = () => <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>;
@@ -544,12 +545,12 @@ export default function HandoutsPage() {
 
   useEffect(() => { load(); }, []);
 
-  async function handleDownload(h: any) {
+  async function handleDownload(h: any, url: string) {
     const supabase = createClient();
     supabase.rpc('increment_handout_download', { p_id: h.id }).then(() => {
       setHandouts(prev => prev.map(x => x.id === h.id ? { ...x, download_count: (x.download_count || 0) + 1 } : x));
     });
-    window.open(h.file_url, '_blank');
+    window.open(url, '_blank', 'noopener,noreferrer');
   }
 
   async function handleDelete(id: string) {
@@ -674,6 +675,7 @@ export default function HandoutsPage() {
               const cc = courseColor(h.course);
               const rs = reviewStats[h.id];
               const myReview = rs?.mine;
+              const fileUrl = publicStorageUrl(h.file_url, 'handouts');
               return (
                 <div key={h.id}
                   style={{ background: 'var(--navy2)', border: '1px solid var(--border)', borderRadius: 16, padding: '16px 20px', display: 'flex', gap: 16, alignItems: 'center', transition: 'border-color 0.15s', cursor: 'pointer' }}
@@ -742,12 +744,14 @@ export default function HandoutsPage() {
                         <span style={{ display:'inline-flex', alignItems:'center', gap:3 }}>{myReview ? <><StarFillIcon /> {myReview.rating}/5</> : <><StarOutIcon /> Rate</>}</span>
                       </button>
                     )}
-                    <button onClick={() => handleDownload(h)}
-                      style={{ height: 36, padding: '0 18px', borderRadius: 100, border: 'none', background: '#12A150', color: '#ffffff', fontSize: 13, fontWeight: 800, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6, transition: 'opacity 0.15s', whiteSpace: 'nowrap' }}
-                      onMouseEnter={e => (e.currentTarget.style.opacity = '0.85')}
-                      onMouseLeave={e => (e.currentTarget.style.opacity = '1')}>
-                      ↓ Download
-                    </button>
+                    {fileUrl && (
+                      <button onClick={() => handleDownload(h, fileUrl)}
+                        style={{ height: 36, padding: '0 18px', borderRadius: 100, border: 'none', background: '#12A150', color: '#ffffff', fontSize: 13, fontWeight: 800, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6, transition: 'opacity 0.15s', whiteSpace: 'nowrap' }}
+                        onMouseEnter={e => (e.currentTarget.style.opacity = '0.85')}
+                        onMouseLeave={e => (e.currentTarget.style.opacity = '1')}>
+                        ↓ Download
+                      </button>
+                    )}
                   </div>
                 </div>
               );

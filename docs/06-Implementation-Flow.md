@@ -16,9 +16,10 @@
    - Already have tables and don't want to lose data? Run **`db/upgrade-roommates.sql`** instead.
 2. Run **`db/storage-setup.sql`** (creates the `listing-media` bucket for photos/videos).
 3. Run **`db/make-admin.sql`** with **your** email to become the only admin.
-4. Add `.env` keys (`NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`).
-5. `npm install` → `npm run dev` → open the local URL.
-6. Smoke test: sign up a vendor → post a service → sign up a student → Book it.
+4. Run the other `db/*.sql` files you need, then **`db/security-hardening.sql` last** (re-run it after re-running any other db file).
+5. Add `.env` keys (`NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, and server-only `SUPABASE_SERVICE_ROLE_KEY`).
+6. `npm install` → `npm run dev` → open the local URL.
+7. Smoke test: sign up a vendor → post a service → sign up a student → Book it.
 
 ## 6.2 Status board
 ### ✅ Done
@@ -58,7 +59,7 @@
 - Keep **docs in sync** (`docs/`) and the **schema in sync** (`db/schema.sql`).
 
 ## 6.4 Definition of "done" for a feature
-1. Form validated (required fields, 10-digit phone, positive prices).
+1. Form validated (required fields, valid phone number, positive prices).
 2. Writes/reads the correct Supabase table with RLS respected.
 3. Empty state + loading state present.
 4. Works for the right role; guarded if needed.

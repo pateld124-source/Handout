@@ -16,9 +16,15 @@ DROP POLICY IF EXISTS svl_read_public ON public.service_listings;
 CREATE POLICY svl_read_public ON public.service_listings  FOR SELECT TO anon USING (is_active = true);
 
 -- Poster names for guests WITHOUT exposing emails/phones/addresses:
--- a view that returns ONLY id + name + join date.
-CREATE OR REPLACE VIEW public.public_profiles AS
-  SELECT id, full_name, created_at FROM public.users;
+-- a read-only view of safe fields (city/state only for signed-in users).
+DROP VIEW IF EXISTS public.public_profiles;
+CREATE VIEW public.public_profiles AS
+  SELECT id, full_name, avatar_url, role, is_verified,
+         CASE WHEN auth.uid() IS NOT NULL THEN city END AS city,
+         CASE WHEN auth.uid() IS NOT NULL THEN state END AS state,
+         created_at
+  FROM public.users;
+REVOKE ALL ON public.public_profiles FROM PUBLIC, anon, authenticated;
 GRANT SELECT ON public.public_profiles TO anon, authenticated;
 
 NOTIFY pgrst, 'reload schema';

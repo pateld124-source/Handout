@@ -4,7 +4,7 @@
 --
 --   1. Students must sign up with a .edu email — enforced server-side (catches
 --      Google/Apple OAuth too, which can't be checked client-side before the
---      provider redirect). Vendors are exempt (they're businesses, not students).
+--      provider redirect). Vendors and providers are exempt (businesses, not students).
 --   2. No two accounts can share the same phone number (partial unique index,
 --      ignores NULL/blank — phone is optional).
 --   3. phone_number_taken() — a SECURITY DEFINER check the signup forms call
@@ -21,9 +21,9 @@ RETURNS TRIGGER LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
 DECLARE
   v_role text := NEW.raw_user_meta_data->>'role';
 BEGIN
-  -- OAuth signups never carry a role in metadata, so NULL is treated as
-  -- 'student' (matches the default in handle_new_user()). Vendors are exempt.
-  IF (v_role IS NULL OR v_role = 'student')
+  -- Only vendor/provider signups are exempt; any other metadata role (or none,
+  -- e.g. OAuth) becomes a student in handle_new_user().
+  IF COALESCE(v_role, '') NOT IN ('vendor', 'provider')
      AND NEW.email IS NOT NULL
      AND NEW.email !~* '\.edu$' THEN
     RAISE EXCEPTION 'Students must sign up with a .edu university email address.'

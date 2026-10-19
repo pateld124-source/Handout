@@ -200,6 +200,28 @@ function normaliseMenu(raw: Record<string, any> | null): Record<string, any> | n
   return out;
 }
 
+/* ── Listing reviews; reviewer names come from public_profiles (users is own-row only) ── */
+async function fetchListingReviews(supabase: ReturnType<typeof createClient>, vendorId: string, listingId: string) {
+  const { data: rev } = await supabase
+    .from('reviews')
+    .select('*')
+    .eq('reviewee_id', vendorId)
+    .eq('listing_type', 'tiffin')
+    .eq('listing_id', listingId)
+    .order('created_at', { ascending: false })
+    .limit(8);
+  if (!rev?.length) return [];
+  const reviewerIds = Array.from(new Set(rev.map(r => r.reviewer_id).filter(Boolean)));
+  const { data: profiles } = await supabase
+    .from('public_profiles')
+    .select('id, full_name, avatar_url')
+    .in('id', reviewerIds);
+  return rev.map(r => {
+    const p = profiles?.find(x => x.id === r.reviewer_id);
+    return { ...r, reviewer: p ? { full_name: p.full_name, avatar_url: p.avatar_url } : null };
+  });
+}
+
 /* ── Plan card ── */
 function PlanCard({
   title, badge, price, originalPrice, suffix, desc, discPct, savings,
@@ -298,15 +320,7 @@ export default function VendorDetailPage() {
       checkPendingReview(id);
 
       // Only fetch reviews for this specific tiffin listing
-      const { data: rev } = await supabase
-        .from('reviews')
-        .select('*, reviewer:reviewer_id(full_name, avatar_url)')
-        .eq('reviewee_id', l.user_id)
-        .eq('listing_type', 'tiffin')
-        .eq('listing_id', id)
-        .order('created_at', { ascending: false })
-        .limit(8);
-      setReviews(rev || []);
+      setReviews(await fetchListingReviews(supabase, l.user_id, id));
       setLoading(false);
     })();
   }, [id]);
@@ -360,18 +374,7 @@ export default function VendorDetailPage() {
     setShowReviewModal(false);
     setReviewPrompt(false);
     // Refresh reviews
-    (async () => {
-      const supabase = createClient();
-      const { data: rev } = await supabase
-        .from('reviews')
-        .select('*, reviewer:reviewer_id(full_name, avatar_url)')
-        .eq('reviewee_id', listing.user_id)
-        .eq('listing_type', 'tiffin')
-        .eq('listing_id', id)
-        .order('created_at', { ascending: false })
-        .limit(8);
-      setReviews(rev || []);
-    })();
+    fetchListingReviews(createClient(), listing.user_id, id).then(setReviews);
   }
 
   return (

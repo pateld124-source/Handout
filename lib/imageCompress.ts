@@ -1,5 +1,5 @@
 // Client-side image compression so uploads stay small (storage is limited).
-// Images: resized to max 1600px and recompressed until ≤ ~1 MB.
+// Images: always re-encoded to JPEG (drops EXIF/GPS), resized to max 1600px and recompressed until ≤ ~1 MB.
 // Videos: max 1 per listing, ≤ 20 MB. Max 10 files total.
 
 const MAX_FILES = 10;
@@ -10,6 +10,7 @@ const MAX_DIM = 1600;
 
 function compressImage(file: File): Promise<File> {
   return new Promise((resolve, reject) => {
+    const fail = () => reject(new Error(`${file.name}: could not be processed.`));
     const url = URL.createObjectURL(file);
     const img = new Image();
     img.onload = () => {
@@ -22,11 +23,13 @@ function compressImage(file: File): Promise<File> {
       const canvas = document.createElement('canvas');
       canvas.width = width; canvas.height = height;
       const ctx = canvas.getContext('2d');
-      if (!ctx) { resolve(file); return; }
+      if (!ctx) { fail(); return; }
+      ctx.fillStyle = '#ffffff';
+      ctx.fillRect(0, 0, width, height);
       ctx.drawImage(img, 0, 0, width, height);
       const tryQ = (q: number) => {
         canvas.toBlob((blob) => {
-          if (!blob) { resolve(file); return; }
+          if (!blob) { fail(); return; }
           if (blob.size <= MAX_IMAGE_BYTES || q <= 0.4) {
             resolve(new File([blob], file.name.replace(/\.\w+$/, '') + '.jpg', { type: 'image/jpeg' }));
           } else tryQ(q - 0.12);
@@ -34,9 +37,15 @@ function compressImage(file: File): Promise<File> {
       };
       tryQ(0.82);
     };
-    img.onerror = () => { URL.revokeObjectURL(url); reject(new Error('Could not read ' + file.name)); };
+    img.onerror = () => { URL.revokeObjectURL(url); fail(); };
     img.src = url;
   });
+}
+
+export async function prepareImageUpload(file: File): Promise<File> {
+  if (!file.type.startsWith('image/')) throw new Error(`${file.name}: not a photo.`);
+  if (file.size > MAX_ORIGINAL_BYTES) throw new Error(`${file.name}: photo too big (max 8 MB).`);
+  return compressImage(file);
 }
 
 export async function processPickedFiles(list: FileList | null): Promise<{ files: File[]; error?: string }> {
@@ -54,9 +63,8 @@ export async function processPickedFiles(list: FileList | null): Promise<{ files
       videoCount++; out.push(f); continue;
     }
     if (!f.type.startsWith('image/')) { problems.push(`${f.name}: not a photo or video.`); continue; }
-    if (f.size > MAX_ORIGINAL_BYTES) { problems.push(`${f.name}: photo too big (max 8 MB).`); continue; }
-    try { out.push(f.size <= 300 * 1024 ? f : await compressImage(f)); }
-    catch { problems.push(`${f.name}: could not be processed.`); }
+    try { out.push(await prepareImageUpload(f)); }
+    catch (e) { problems.push((e as Error).message); }
   }
   return { files: out, error: problems.length ? problems.join('\n') : undefined };
 }

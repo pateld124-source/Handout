@@ -1,4 +1,7 @@
 /** @type {import('next').NextConfig} */
+// next dev needs eval (React Refresh); production builds do not.
+const isDev = process.env.NODE_ENV === 'development';
+
 const nextConfig = {
   async headers() {
     return [
@@ -15,17 +18,22 @@ const nextConfig = {
             key: 'Content-Security-Policy',
             value: [
               "default-src 'self'",
-              "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://*.supabase.co",
+              `script-src 'self' 'unsafe-inline'${isDev ? " 'unsafe-eval'" : ''}`,
               "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
               "font-src 'self' https://fonts.gstatic.com data:",
               "img-src 'self' data: blob: https:",
               "connect-src 'self' https://*.supabase.co wss://*.supabase.co",
               "frame-ancestors 'none'",
+              "base-uri 'self'",
+              "form-action 'self'",
             ].join('; '),
           },
         ],
       },
     ];
+  },
+  async redirects() {
+    return [{ source: '/', destination: '/landing', permanent: false }];
   },
   experimental: { serverActions: { bodySizeLimit: '2mb' } },
 };

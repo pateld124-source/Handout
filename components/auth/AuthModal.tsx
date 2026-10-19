@@ -85,11 +85,14 @@ export function AuthModal({
       if (err) { setError(err.message); setLoading(false); return; }
       if (!data.user) { setError('Could not create account. Try again.'); setLoading(false); return; }
 
-      // Try to update profile (best-effort)
-      try { await supabase.from('users').update({ full_name: name.trim(), phone, role }).eq('id', data.user.id); } catch {}
-
       if (data.session) {
         // Email confirmation is OFF in Supabase — user is in directly
+        // Profile update needs a session (RLS: auth.uid() = id). onSuccess navigates away, so report via alert.
+        const { error: profileErr } = await supabase.from('users').update({ full_name: name.trim(), phone, role }).eq('id', data.user.id);
+        if (profileErr) {
+          console.error('Profile update after sign-up failed:', profileErr);
+          alert('Your account was created, but we could not save your profile details. You can update them in your profile.');
+        }
         onSuccess(data.user);
       } else {
         // Email confirmation is ON — show OTP verification screen
@@ -201,7 +204,7 @@ export function AuthModal({
             <Field label="Phone number" err={touched.phone ? e.phone : ''}>
               <input className={`fld-input ${touched.phone && e.phone ? 'err' : ''}`}
                 type="tel" inputMode="numeric" value={formatPhone(phone)}
-                placeholder="(555) 123-4567" maxLength={16} disabled={loading}
+                placeholder="(555) 123-4567" maxLength={20} disabled={loading}
                 onChange={ev => setPhone(normalizePhone(ev.target.value))} onBlur={() => t('phone')} />
             </Field>
           )}
@@ -212,7 +215,7 @@ export function AuthModal({
                 type={showPw ? 'text' : 'password'} value={password}
                 placeholder="••••••••" style={{ paddingRight: 58 }} disabled={loading}
                 onChange={ev => setPassword(ev.target.value)} onBlur={() => t('password')} />
-              <button type="button" onClick={() => setShowPw(s => !s)} tabIndex={-1}
+              <button type="button" onClick={() => setShowPw(s => !s)} aria-label={showPw ? 'Hide password' : 'Show password'}
                 style={{ position: 'absolute', right: 12, top: '50%', transform: 'translateY(-50%)', fontSize: 12, fontWeight: 600, color: 'var(--muted)' }}>
                 {showPw ? 'Hide' : 'Show'}
               </button>

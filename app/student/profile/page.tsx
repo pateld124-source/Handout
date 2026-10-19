@@ -3,6 +3,8 @@
 import { useEffect, useRef, useState } from 'react';
 import { StudentLayout } from '@/components/layout/StudentLayout';
 import { createClient } from '@/lib/supabase/client';
+import { deleteAccountAction } from '@/lib/actions/account';
+import { prepareImageUpload } from '@/lib/imageCompress';
 import { validateName, validatePhone } from '@/lib/validation';
 import { UniversitySelect } from '@/components/ui/UniversitySelect';
 import { PhoneOTPVerify } from '@/components/ui/PhoneOTPVerify';
@@ -61,6 +63,7 @@ export default function StudentProfile() {
   const [err, setErr] = useState('');
   const [saved, setSaved] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [deleting, setDeleting] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
 
   const initials = (fullName || email || '?').split(' ').map((n) => n[0]).join('').slice(0, 2).toUpperCase();
@@ -93,12 +96,13 @@ export default function StudentProfile() {
     if (!file) return;
     if (file.size > 5 * 1024 * 1024) { setErr('Image must be under 5 MB'); return; }
     setUploading(true); setErr('');
+    const jpeg = await prepareImageUpload(file).catch((e: Error) => { setErr(e.message); return null; });
+    if (!jpeg) { setUploading(false); return; }
     const supabase = createClient();
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) { setUploading(false); return; }
-    const ext = file.name.split('.').pop();
-    const path = `${user.id}/avatar.${ext}`;
-    const { error: upErr } = await supabase.storage.from('avatars').upload(path, file, { upsert: true });
+    const path = `${user.id}/avatar.jpg`;
+    const { error: upErr } = await supabase.storage.from('avatars').upload(path, jpeg, { upsert: true });
     if (upErr) { setErr('Upload failed: ' + upErr.message); setUploading(false); return; }
     const { data: { publicUrl } } = supabase.storage.from('avatars').getPublicUrl(path);
     const urlWithBust = `${publicUrl}?t=${Date.now()}`;
@@ -143,13 +147,9 @@ export default function StudentProfile() {
 
   async function deleteAccount() {
     if (!confirm('Delete your account permanently? All data will be removed. This cannot be undone.')) return;
-    const supabase = createClient();
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return;
-    await supabase.from('roommate_listings').delete().eq('user_id', user.id);
-    await supabase.from('student_profiles').delete().eq('user_id', user.id);
-    await supabase.from('users').delete().eq('id', user.id);
-    await supabase.auth.signOut();
+    setDeleting(true); setErr('');
+    const res = await deleteAccountAction();
+    if (res.error) { setErr(res.error); setDeleting(false); return; }
     window.location.href = '/';
   }
 
@@ -323,9 +323,9 @@ export default function StudentProfile() {
               <p style={{ fontSize: 13, color: 'var(--muted)', marginBottom: 14, lineHeight: 1.5 }}>
                 Permanently delete your account, profile, and all listings. This cannot be undone.
               </p>
-              <button onClick={deleteAccount}
+              <button onClick={deleteAccount} disabled={deleting}
                 style={{ height: 42, padding: '0 20px', background: 'rgba(220,38,38,0.12)', color: '#C25B4E', border: '1px solid rgba(220,38,38,0.3)', borderRadius: 100, fontWeight: 700, fontSize: 13, cursor: 'pointer' }}>
-                Delete my account
+                {deleting ? 'Deleting…' : 'Delete my account'}
               </button>
             </div>
 

@@ -14,6 +14,8 @@ export default defineConfig({
     navigationTimeout: 30_000,
   },
   projects: [
+    // Pure unit tests (no browser, no running app): npm run test:unit
+    { name: 'unit', testDir: './tests/unit' },
     { name: 'setup', testMatch: /auth\.setup\.ts/ },
     { name: 'desktop', use: { ...devices['Desktop Chrome'], viewport: { width: 1280, height: 800 } }, dependencies: ['setup'] },
     // Mobile viewport on Chromium (avoids a separate WebKit download)

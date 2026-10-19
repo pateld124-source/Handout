@@ -232,16 +232,7 @@ export async function sendMessageAction(formData: FormData): Promise<ActionResul
     is_read: false,
   });
   if (error) return { error: error.message };
-
-  // Fire in-app notification to recipient
-  const { data: sender } = await supabase.from('users').select('full_name').eq('id', user.id).single();
-  await supabase.from('notifications').insert({
-    user_id: parsed.data.receiverId,
-    type: 'message',
-    title: `💬 New message from ${sender?.full_name || 'someone'}`,
-    body: parsed.data.content.slice(0, 80),
-    link: `/student/messages?to=${user.id}`,
-  });
+  // The receiver's notification is created by a DB trigger on messages.
   return { ok: true };
 }
 

@@ -1,6 +1,7 @@
 -- ════════════════════════════════════════════════════════════════
--- Gives ADMINS full access to all data, and lets users delete their
--- own account. Run once in Supabase → SQL Editor. Safe to re-run.
+-- Gives ADMINS full access to all data. Members can't delete their own
+-- users row (account deletion runs server-side). Run once in Supabase →
+-- SQL Editor. Safe to re-run.
 -- ════════════════════════════════════════════════════════════════
 
 -- Helper that checks "is the caller an admin?" WITHOUT recursing through
@@ -10,9 +11,8 @@ RETURNS boolean LANGUAGE sql SECURITY DEFINER STABLE SET search_path = public AS
   SELECT EXISTS (SELECT 1 FROM public.users WHERE id = auth.uid() AND role = 'admin')
 $$;
 
--- A user may delete their OWN account row (cascades to their data).
+-- No self-delete policy: account deletion runs server-side with the service role.
 DROP POLICY IF EXISTS users_delete_own ON public.users;
-CREATE POLICY users_delete_own ON public.users FOR DELETE USING (auth.uid() = id);
 
 -- Admins can read / update / delete ANY user.
 DROP POLICY IF EXISTS users_admin_all ON public.users;
@@ -29,4 +29,4 @@ DROP POLICY IF EXISTS wp_admin  ON public.welcome_packages;
 CREATE POLICY wp_admin  ON public.welcome_packages  FOR ALL USING (public.is_admin()) WITH CHECK (public.is_admin());
 
 NOTIFY pgrst, 'reload schema';
-SELECT '✅ Admin + self-delete policies applied.' AS status;
+SELECT '✅ Admin policies applied (self-delete runs server-side).' AS status;

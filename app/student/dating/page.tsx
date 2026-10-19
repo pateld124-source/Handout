@@ -6,6 +6,7 @@ import { createClient } from '@/lib/supabase/client';
 import { StudentLayout } from '@/components/layout/StudentLayout';
 import { UniversitySelect } from '@/components/ui/UniversitySelect';
 import { validateText, validateParagraph } from '@/lib/validation';
+import { prepareImageUpload } from '@/lib/imageCompress';
 import { PointsBadge } from '@/components/rewards/PointsBadge';
 import { BETA_MODE } from '@/config/features';
 import Link from 'next/link';
@@ -73,8 +74,7 @@ function Avi({ photo, name, size=72 }: { photo?:string; name?:string; size?:numb
 }
 async function uploadPhoto(file:File, userId:string): Promise<string> {
   const sb = createClient();
-  const ext  = file.name.split('.').pop();
-  const path = `dating/${userId}_${Date.now()}.${ext}`;
+  const path = `${userId}/dating-${Date.now()}.jpg`;
   const { error } = await sb.storage.from('avatars').upload(path, file, { upsert:true });
   if (error) throw error;
   return sb.storage.from('avatars').getPublicUrl(path).data.publicUrl;
@@ -84,11 +84,15 @@ async function uploadPhoto(file:File, userId:string): Promise<string> {
 function PhotoGrid({ photos, userId, onChange }: { photos:string[]; userId:string; onChange:(arr:string[])=>void }) {
   const refs = [useRef<HTMLInputElement>(null), useRef<HTMLInputElement>(null), useRef<HTMLInputElement>(null)];
   const [uploading, setUploading] = useState<number|null>(null);
+  const [err, setErr] = useState('');
 
   const pick = async (idx:number, e:React.ChangeEvent<HTMLInputElement>) => {
     const f = e.target.files?.[0]; if (!f) return;
-    setUploading(idx);
-    try { const url = await uploadPhoto(f, userId); const next=[...photos]; next[idx]=url; onChange(next); } catch {}
+    setUploading(idx); setErr('');
+    const jpeg = await prepareImageUpload(f).catch((x:Error) => { setErr(x.message); return null; });
+    if (!jpeg) { setUploading(null); return; }
+    try { const url = await uploadPhoto(jpeg, userId); const next=[...photos]; next[idx]=url; onChange(next); }
+    catch { setErr('Photo upload failed — please try again.'); }
     setUploading(null);
   };
   const remove = (idx:number) => { const next=[...photos]; next.splice(idx,1); onChange(next); };
@@ -123,6 +127,7 @@ function PhotoGrid({ photos, userId, onChange }: { photos:string[]; userId:strin
           );
         })}
       </div>
+      {err && <div style={{ marginTop:14, padding:'10px 14px', borderRadius:10, background:'rgba(255,60,60,0.12)', border:'1px solid rgba(255,60,60,0.3)', color:'#ff6b6b', fontSize:13 }}>{err}</div>}
     </div>
   );
 }
@@ -185,14 +190,14 @@ function SetupModal({ me, onSave }: { me:Me; onSave:(p:DProfile)=>void }) {
   const [saveErr,   setSaveErr]   = useState('');
 
   const toggleI = (i:string) => setInterests(p=>p.includes(i)?p.filter(x=>x!==i):p.length<6?[...p,i]:p);
-  const canNext  = step===0 ? (!!name && !!age && parseInt(age)>=16 && parseInt(age)<=100 && !!gender) : true;
+  const canNext  = step===0 ? (!!name && !!age && parseInt(age)>=18 && parseInt(age)<=60 && !!gender) : true;
 
   const save = async () => {
     if (!name||!age||!gender) return;
     // Validate name (letters/numbers), age range, and bio length
     const nErr = validateText(name, 'Name', { min: 2, max: 40 });
     const aNum = parseInt(age);
-    const aErr = (!aNum || aNum < 18 || aNum > 99) ? 'Age must be between 18 and 99' : '';
+    const aErr = (!aNum || aNum < 18 || aNum > 60) ? 'Age must be between 18 and 60' : '';
     const bErr = validateParagraph(bio, 'Bio', { max: 500 });
     if (nErr || aErr || bErr) { setSaveErr(nErr || aErr || bErr); return; }
     setSaving(true); setSaveErr('');
@@ -224,7 +229,7 @@ function SetupModal({ me, onSave }: { me:Me; onSave:(p:DProfile)=>void }) {
               <input value={name} onChange={e=>setName(e.target.value)} placeholder="Your first name" style={INP}/></div>
             <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:12 }}>
               <div><label style={{ fontSize:12, color:'var(--muted)', display:'block', marginBottom:6 }}>Your age</label>
-                <input type="number" min={16} max={100} value={age} onChange={e=>setAge(e.target.value)} placeholder="21" style={INP}/></div>
+                <input type="number" min={18} max={60} value={age} onChange={e=>setAge(e.target.value)} placeholder="21" style={INP}/></div>
               <div><label style={{ fontSize:12, color:'var(--muted)', display:'block', marginBottom:6 }}>Height <span style={{ color:'#9aa8a0' }}>(cm, optional)</span></label>
                 <input type="number" value={height} onChange={e=>setHeight(e.target.value)} placeholder="170" style={INP}/></div>
             </div>
