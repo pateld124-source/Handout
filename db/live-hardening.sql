@@ -23,6 +23,11 @@ DO $$ BEGIN
   PERFORM set_config('hardening.bucket_error', '', false);
 END $$;
 
+-- Every policy below calls public.is_admin(); members and guests must be able to run it
+-- (it only answers "is the caller an admin?"). Without this, sign-in fails with
+-- "permission denied for function is_admin".
+GRANT EXECUTE ON FUNCTION public.is_admin() TO anon, authenticated;
+
 -- ── 1. USERS — signup: same as live, but the metadata role is clamped ─────
 CREATE OR REPLACE FUNCTION public.handle_new_user()
  RETURNS trigger
