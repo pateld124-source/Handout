@@ -75,6 +75,15 @@ BEGIN
   END IF;
 END $$;
 
+-- Can the calling role see any city/state through public_profiles? A view hides
+-- them behind NULLs; the live table hides them with a column privilege (42501).
+CREATE FUNCTION test.city_or_state_visible() RETURNS boolean LANGUAGE plpgsql AS $$
+BEGIN
+  RETURN EXISTS (SELECT 1 FROM public.public_profiles WHERE city IS NOT NULL OR state IS NOT NULL);
+EXCEPTION WHEN insufficient_privilege THEN
+  RETURN false;
+END $$;
+
 -- ── seed (signups go through auth.users, i.e. the real signup triggers) ───
 INSERT INTO test.people (name, id, email) VALUES
   ('admin', '00000000-0000-4000-8000-000000000001', 'admin@uni.edu'),
@@ -355,9 +364,9 @@ ROLLBACK;
 
 \set case 'C2 public_profiles has exactly the agreed columns'
 BEGIN;
-SELECT test.eq(:'case', (SELECT string_agg(column_name::text, ',' ORDER BY ordinal_position)
+SELECT test.eq(:'case', (SELECT string_agg(column_name::text, ',' ORDER BY column_name)
   FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'public_profiles'),
-  'id,full_name,avatar_url,role,is_verified,city,state,created_at');
+  'avatar_url,city,created_at,full_name,id,is_verified,role,state');
 SELECT 'PASS: ' || :'case';
 ROLLBACK;
 
@@ -373,8 +382,7 @@ ROLLBACK;
 BEGIN;
 SELECT test.as_anon();
 SELECT test.eq(:'case', (SELECT full_name FROM public.public_profiles WHERE id = test.uid('bob')), 'Bob');
-SELECT test.eq(:'case', (SELECT count(*) FROM public.public_profiles WHERE city IS NOT NULL OR state IS NOT NULL),
-  0::bigint);
+SELECT test.eq(:'case', test.city_or_state_visible(), false);
 SELECT 'PASS: ' || :'case';
 ROLLBACK;
 
@@ -385,6 +393,67 @@ SELECT test.denied(:'case', $$UPDATE public.public_profiles SET full_name = 'x' 
 SELECT test.denied(:'case', format($$DELETE FROM public.public_profiles WHERE id = %L$$, test.uid('bob')));
 SELECT test.as_anon();
 SELECT test.denied(:'case', format($$UPDATE public.public_profiles SET full_name = 'x' WHERE id = %L$$, test.uid('bob')));
+SELECT 'PASS: ' || :'case';
+ROLLBACK;
+
+\set case 'C2 live public_profiles table is kept: still a table with its foreign keys'
+BEGIN;
+SELECT test.eq(:'case', (SELECT relkind::text FROM pg_class WHERE oid = 'public.public_profiles'::regclass), 'r');
+SELECT test.eq(:'case', (SELECT count(*) FROM pg_constraint WHERE confrelid = 'public.public_profiles'::regclass AND contype = 'f'), 3::bigint);
+SELECT 'PASS: ' || :'case';
+ROLLBACK;
+
+\set case 'C2 profile changes still reach public_profiles through the sync trigger'
+BEGIN;
+SELECT test.as_user('alice');
+SELECT test.rows(:'case', $$UPDATE public.users SET full_name = 'Alice Renamed' WHERE id = auth.uid()$$, 1);
+SELECT test.as_anon();
+SELECT test.eq(:'case', (SELECT full_name FROM public.public_profiles WHERE id = test.uid('alice')), 'Alice Renamed');
+SELECT 'PASS: ' || :'case';
+ROLLBACK;
+
+\set case 'C2 guests must name columns on the public_profiles table (select * is denied)'
+BEGIN;
+SELECT test.as_anon();
+SELECT test.denied(:'case', $$SELECT * FROM public.public_profiles$$);
+SELECT test.rows(:'case', $$SELECT id, full_name, avatar_url FROM public.public_profiles$$, 7);
+SELECT 'PASS: ' || :'case';
+ROLLBACK;
+
+-- ════════════════════ listings: phone numbers (db/hide-listing-phones.sql) ═
+-- One active and one inactive row per table, owned by bob (inserted as table owner).
+\set case 'L1 guest cannot read contact_phone on any listing table'
+BEGIN;
+INSERT INTO public.roommate_listings (user_id, title, contact_phone, is_active) VALUES (test.uid('bob'), 'Room L1', '555-0100', true);
+INSERT INTO public.service_listings  (user_id, title, contact_phone, is_active) VALUES (test.uid('bob'), 'Service L1', '555-0101', true);
+INSERT INTO public.tiffin_listings   (user_id, name,  contact_phone, is_active) VALUES (test.uid('bob'), 'Tiffin L1', '555-0102', true);
+SELECT test.as_anon();
+SELECT test.denied(:'case', $$SELECT contact_phone FROM public.roommate_listings$$);
+SELECT test.denied(:'case', $$SELECT contact_phone FROM public.service_listings$$);
+SELECT test.denied(:'case', $$SELECT contact_phone FROM public.tiffin_listings$$);
+SELECT test.denied(:'case', $$SELECT * FROM public.roommate_listings$$);
+SELECT 'PASS: ' || :'case';
+ROLLBACK;
+
+\set case 'L1 guest still reads the active listings by naming columns'
+BEGIN;
+INSERT INTO public.roommate_listings (user_id, title, contact_phone, is_active) VALUES (test.uid('bob'), 'Room L1', '555-0100', true), (test.uid('bob'), 'Hidden L1', '555-0103', false);
+INSERT INTO public.service_listings  (user_id, title, contact_phone, is_active) VALUES (test.uid('bob'), 'Service L1', '555-0101', true);
+INSERT INTO public.tiffin_listings   (user_id, name,  contact_phone, is_active) VALUES (test.uid('bob'), 'Tiffin L1', '555-0102', true);
+SELECT test.as_anon();
+SELECT test.rows(:'case', $$SELECT id, user_id, title, location, rent, media, is_active, created_at FROM public.roommate_listings$$, 1);
+SELECT test.rows(:'case', $$SELECT id, title, category, rate, details FROM public.service_listings$$, 1);
+SELECT test.rows(:'case', $$SELECT id, name, cuisine, price_per_meal, weekly_menu FROM public.tiffin_listings$$, 1);
+SELECT 'PASS: ' || :'case';
+ROLLBACK;
+
+\set case 'L1 signed-in member still reads contact_phone'
+BEGIN;
+INSERT INTO public.roommate_listings (user_id, title, contact_phone, is_active) VALUES (test.uid('bob'), 'Room L1', '555-0100', true);
+INSERT INTO public.tiffin_listings   (user_id, name,  contact_phone, is_active) VALUES (test.uid('bob'), 'Tiffin L1', '555-0102', true);
+SELECT test.as_user('alice');
+SELECT test.eq(:'case', (SELECT contact_phone FROM public.roommate_listings WHERE title = 'Room L1'), '555-0100');
+SELECT test.eq(:'case', (SELECT contact_phone FROM public.tiffin_listings WHERE name = 'Tiffin L1'), '555-0102');
 SELECT 'PASS: ' || :'case';
 ROLLBACK;
 

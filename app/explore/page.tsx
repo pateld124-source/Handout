@@ -6,6 +6,7 @@
 // "show value before the wall" conversion page: people see the app is alive,
 // then create an account to actually reach someone.
 
+import { ROOMMATE_PUBLIC_COLUMNS } from '@/lib/listingColumns';
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { createClient } from '@/lib/supabase/client';
@@ -89,7 +90,7 @@ export default function ExplorePage() {
       const sb = createClient();
       const today = new Date().toISOString().split('T')[0];
       const [{ data: r }, { data: m }, { data: p }, { data: e }] = await Promise.all([
-        sb.from('roommate_listings').select('*').eq('is_active', true).order('created_at', { ascending: false }).limit(8),
+        sb.from('roommate_listings').select(ROOMMATE_PUBLIC_COLUMNS).eq('is_active', true).order('created_at', { ascending: false }).limit(8),
         sb.from('market_listings').select('*').eq('is_active', true).order('created_at', { ascending: false }).limit(8),
         sb.from('community_posts').select('id,title,content,created_at').eq('is_active', true).order('created_at', { ascending: false }).limit(6),
         sb.from('campus_events').select('*').eq('is_active', true).gte('event_date', today).order('event_date', { ascending: true }).limit(6),

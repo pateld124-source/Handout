@@ -17,15 +17,22 @@ CREATE POLICY svl_read_public ON public.service_listings  FOR SELECT TO anon USI
 
 -- Poster names for guests WITHOUT exposing emails/phones/addresses:
 -- a read-only view of safe fields (city/state only for signed-in users).
-DROP VIEW IF EXISTS public.public_profiles;
-CREATE VIEW public.public_profiles AS
-  SELECT id, full_name, avatar_url, role, is_verified,
-         CASE WHEN auth.uid() IS NOT NULL THEN city END AS city,
-         CASE WHEN auth.uid() IS NOT NULL THEN state END AS state,
-         created_at
-  FROM public.users;
-REVOKE ALL ON public.public_profiles FROM PUBLIC, anon, authenticated;
-GRANT SELECT ON public.public_profiles TO anon, authenticated;
+-- Skipped when public_profiles is a TABLE (the live project): CREATE VIEW would
+-- fail there, and db/security-hardening.sql locks the table down instead.
+DO $$
+BEGIN
+  IF COALESCE((SELECT relkind FROM pg_class WHERE oid = to_regclass('public.public_profiles')), 'v') = 'v' THEN
+    DROP VIEW IF EXISTS public.public_profiles;
+    CREATE VIEW public.public_profiles AS
+      SELECT id, full_name, avatar_url, role, is_verified,
+             CASE WHEN auth.uid() IS NOT NULL THEN city END AS city,
+             CASE WHEN auth.uid() IS NOT NULL THEN state END AS state,
+             created_at
+      FROM public.users;
+    REVOKE ALL ON public.public_profiles FROM PUBLIC, anon, authenticated;
+    GRANT SELECT ON public.public_profiles TO anon, authenticated;
+  END IF;
+END $$;
 
 NOTIFY pgrst, 'reload schema';
 SELECT '✅ Public can now browse listings. Names come from public_profiles (safe fields only).' AS status;

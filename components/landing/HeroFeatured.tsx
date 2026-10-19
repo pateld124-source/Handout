@@ -1,5 +1,6 @@
 'use client';
 
+import { ROOMMATE_PUBLIC_COLUMNS } from '@/lib/listingColumns';
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { createClient } from '@/lib/supabase/client';
@@ -14,7 +15,7 @@ export function HeroFeatured() {
         // Filter out the logged-in user's own listing at the DB level
         const { data: authData } = await supabase.auth.getUser();
         const meId = authData?.user?.id;
-        let q = supabase.from('roommate_listings').select('*').eq('is_active', true).order('created_at', { ascending: false }).limit(1);
+        let q = supabase.from('roommate_listings').select(ROOMMATE_PUBLIC_COLUMNS).eq('is_active', true).order('created_at', { ascending: false }).limit(1);
         if (meId) q = (q as any).neq('user_id', meId);
         const { data } = await q;
         const r = (data || [])[0];

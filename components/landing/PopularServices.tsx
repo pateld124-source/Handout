@@ -1,5 +1,6 @@
 'use client';
 
+import { ROOMMATE_PUBLIC_COLUMNS, SERVICE_PUBLIC_COLUMNS, TIFFIN_PUBLIC_COLUMNS } from '@/lib/listingColumns';
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { createClient } from '@/lib/supabase/client';
@@ -22,9 +23,9 @@ export function PopularServices() {
       try {
         const supabase = createClient();
         const [{ data: tf }, { data: sv }, { data: rm }] = await Promise.all([
-          supabase.from('tiffin_listings').select('*').eq('is_active', true).order('created_at', { ascending: false }).limit(4),
-          supabase.from('service_listings').select('*').eq('is_active', true).order('created_at', { ascending: false }).limit(4),
-          supabase.from('roommate_listings').select('*').eq('is_active', true).order('created_at', { ascending: false }).limit(2),
+          supabase.from('tiffin_listings').select(TIFFIN_PUBLIC_COLUMNS).eq('is_active', true).order('created_at', { ascending: false }).limit(4),
+          supabase.from('service_listings').select(SERVICE_PUBLIC_COLUMNS).eq('is_active', true).order('created_at', { ascending: false }).limit(4),
+          supabase.from('roommate_listings').select(ROOMMATE_PUBLIC_COLUMNS).eq('is_active', true).order('created_at', { ascending: false }).limit(2),
         ]);
 
         const food = (tf || []).map((r: any) => ({

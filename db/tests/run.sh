@@ -119,6 +119,9 @@ if (( HARDENING )); then
   load "$HERE/db/security-hardening.sql" || die "db/security-hardening.sql (1st run)"
   load "$HERE/db/security-hardening.sql" || die "db/security-hardening.sql (2nd run)"
   echo "PASS: security-hardening.sql applied twice without error"
+  load "$HERE/db/hide-listing-phones.sql" || die "db/hide-listing-phones.sql (1st run)"
+  load "$HERE/db/hide-listing-phones.sql" || die "db/hide-listing-phones.sql (2nd run)"
+  echo "PASS: hide-listing-phones.sql applied twice without error"
 fi
 
 run_tests "$LOG_DIR/test.log" "tests"

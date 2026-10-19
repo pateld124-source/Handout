@@ -1,5 +1,6 @@
 'use client';
 
+import { ROOMMATE_PUBLIC_COLUMNS } from '@/lib/listingColumns';
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useAuthGate } from '@/components/auth/AuthGate';
@@ -15,7 +16,7 @@ export function RoommatePreview() {
     (async () => {
       try {
         const supabase = createClient();
-        const { data } = await supabase.from('roommate_listings').select('*').eq('is_active', true).order('created_at', { ascending: false }).limit(3);
+        const { data } = await supabase.from('roommate_listings').select(ROOMMATE_PUBLIC_COLUMNS).eq('is_active', true).order('created_at', { ascending: false }).limit(3);
         const list = data || [];
         const uids = Array.from(new Set(list.map(r => r.user_id).filter(Boolean)));
         const names: Record<string, any> = {};

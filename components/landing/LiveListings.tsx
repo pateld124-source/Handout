@@ -4,6 +4,7 @@
 // listings (rooms + marketplace) so visitors SEE the product before the wall.
 // Falls back to illustrative cards while a campus is still filling up.
 
+import { ROOMMATE_PUBLIC_COLUMNS } from '@/lib/listingColumns';
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { createClient } from '@/lib/supabase/client';
@@ -33,7 +34,7 @@ export function LiveListings() {
       try {
         const sb = createClient();
         const [{ data: rooms }, { data: items }] = await Promise.all([
-          sb.from('roommate_listings').select('*').eq('is_active', true).order('created_at', { ascending:false }).limit(3),
+          sb.from('roommate_listings').select(ROOMMATE_PUBLIC_COLUMNS).eq('is_active', true).order('created_at', { ascending:false }).limit(3),
           sb.from('market_listings').select('*').eq('is_active', true).order('created_at', { ascending:false }).limit(3),
         ]);
         const r: Card[] = (rooms || []).map((x:any) => ({

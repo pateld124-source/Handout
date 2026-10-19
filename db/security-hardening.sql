@@ -15,7 +15,8 @@
 --      Signup metadata roles are clamped to student/vendor/provider and only
 --      vendor/provider signups are exempt from the .edu rule.
 --   2. public.users reads — own row (admins: all rows). Other members are read
---      through the read-only public_profiles view.
+--      through the read-only public_profiles (a view, or on the live project
+--      the existing table, which is kept and locked down - never dropped).
 --   3. verifications — members can only submit/resubmit as 'pending'.
 --      Deleting an admin who reviewed verifications clears reviewed_by
 --      instead of failing.
@@ -168,16 +169,42 @@ CREATE POLICY users_limit_delete ON public.users AS RESTRICTIVE FOR DELETE TO an
   USING (public.is_admin());
 
 -- ── 2. PUBLIC PROFILES (safe columns of other members; read-only) ─────────
-DROP VIEW IF EXISTS public.public_profiles;
--- Runs with the owner's rights so it can show these columns of other members.
-CREATE VIEW public.public_profiles AS
-  SELECT id, full_name, avatar_url, role, is_verified,
-         CASE WHEN auth.uid() IS NOT NULL THEN city END AS city,
-         CASE WHEN auth.uid() IS NOT NULL THEN state END AS state,
-         created_at
-  FROM public.users;
-REVOKE ALL ON public.public_profiles FROM PUBLIC, anon, authenticated;
-GRANT SELECT ON public.public_profiles TO anon, authenticated;
+-- Two shapes exist. db/schema.sql and db/public-read-policies.sql create a VIEW
+-- over public.users. The live Supabase project has a TABLE with the same name,
+-- kept in sync by sync_public_profile_trg and referenced by foreign keys from
+-- other tables (the app embeds poster names through them). A table is never
+-- dropped here: dropping it would remove those foreign keys and leave the sync
+-- trigger writing into nothing. Either way guests may read the safe columns,
+-- members additionally city/state, and nobody can write through the API.
+DO $$
+DECLARE
+  v_kind "char";
+BEGIN
+  SELECT relkind INTO v_kind FROM pg_class WHERE oid = to_regclass('public.public_profiles');
+
+  IF v_kind IN ('r', 'p') THEN
+    -- TABLE (live): keep it, lock it down. Its RLS read policy stays in place.
+    ALTER TABLE public.public_profiles ENABLE ROW LEVEL SECURITY;
+    REVOKE ALL ON public.public_profiles FROM PUBLIC, anon, authenticated;
+    -- guests: no city/state (a column privilege instead of the view's NULLs);
+    -- a guest query must therefore name columns, never select *
+    GRANT SELECT (id, full_name, avatar_url, role, is_verified, created_at)
+      ON public.public_profiles TO anon;
+    GRANT SELECT ON public.public_profiles TO authenticated;
+  ELSE
+    -- VIEW (fresh install) or not there yet
+    DROP VIEW IF EXISTS public.public_profiles;
+    -- Runs with the owner's rights so it can show these columns of other members.
+    CREATE VIEW public.public_profiles AS
+      SELECT id, full_name, avatar_url, role, is_verified,
+             CASE WHEN auth.uid() IS NOT NULL THEN city END AS city,
+             CASE WHEN auth.uid() IS NOT NULL THEN state END AS state,
+             created_at
+      FROM public.users;
+    REVOKE ALL ON public.public_profiles FROM PUBLIC, anon, authenticated;
+    GRANT SELECT ON public.public_profiles TO anon, authenticated;
+  END IF;
+END $$;
 
 -- ── 3. VERIFICATIONS ──────────────────────────────────────────────────────
 ALTER TABLE public.verifications ENABLE ROW LEVEL SECURITY;

@@ -1,5 +1,6 @@
 'use client';
 
+import { ROOMMATE_PUBLIC_COLUMNS, SERVICE_PUBLIC_COLUMNS, TIFFIN_PUBLIC_COLUMNS } from '@/lib/listingColumns';
 import Link from 'next/link';
 import { useState, useEffect } from 'react';
 import { useAuthGate } from '@/components/auth/AuthGate';
@@ -41,9 +42,9 @@ export default function Browse() {
       try {
         const supabase = createClient();
         const [{ data: tf }, { data: sv }, { data: rm }] = await Promise.all([
-          supabase.from('tiffin_listings').select('*').eq('is_active', true).order('created_at', { ascending: false }),
-          supabase.from('service_listings').select('*').eq('is_active', true).order('created_at', { ascending: false }),
-          supabase.from('roommate_listings').select('*').eq('is_active', true).order('created_at', { ascending: false }),
+          supabase.from('tiffin_listings').select(TIFFIN_PUBLIC_COLUMNS).eq('is_active', true).order('created_at', { ascending: false }),
+          supabase.from('service_listings').select(SERVICE_PUBLIC_COLUMNS).eq('is_active', true).order('created_at', { ascending: false }),
+          supabase.from('roommate_listings').select(ROOMMATE_PUBLIC_COLUMNS).eq('is_active', true).order('created_at', { ascending: false }),
         ]);
         const all = [
           ...(rm || []).map((r: any) => ({
