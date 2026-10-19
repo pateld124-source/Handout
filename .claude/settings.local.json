@@ -1,8 +1,0 @@
-{
-  "permissions": {
-    "allow": [
-      "Bash(mkdir -p /Users/darshil/Documents/handout-final/.claude && ls /Users/darshil/Documents/handout-final/.claude)",
-      "Bash(timeout 8 npx --yes serve artifacts -l 4174)"
-    ]
-  }
-}
