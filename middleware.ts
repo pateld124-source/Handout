@@ -44,6 +44,17 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(loginUrl);
   }
 
+  // Admin pages: being signed in is not enough, the account must be an admin.
+  if (pathname.startsWith('/admin')) {
+    const { data: me } = await supabase.from('users').select('role').eq('id', user.id).single();
+    if (me?.role !== 'admin') {
+      const homeUrl = request.nextUrl.clone();
+      homeUrl.pathname = '/';
+      homeUrl.search = '';
+      return NextResponse.redirect(homeUrl);
+    }
+  }
+
   // ── BETA MODE gate ──────────────────────────────────────────────────────
   // Coming-soon routes are preserved but redirected to the Coming Soon page
   // while the beta flag is on. Flipping BETA_MODE off re-enables them with no
