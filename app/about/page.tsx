@@ -1,4 +1,11 @@
+import type { Metadata } from 'next';
 import Link from 'next/link';
+
+export const metadata: Metadata = {
+  title: 'About Handout — The Student Community Built at Rowan University',
+  description: 'Handout is a free student community started at Rowan University: roommates and sublets, a campus marketplace, food, rides and events in one place.',
+  alternates: { canonical: 'https://www.handout.casa/about' },
+};
 
 const STATS = [
   { value: '12,000+', label: 'Students served' },

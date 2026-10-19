@@ -26,6 +26,8 @@ export const metadata: Metadata = {
     "campus events",
   ],
   applicationName: "Handout",
+  // Google Search Console "HTML tag" check: set NEXT_PUBLIC_GOOGLE_SITE_VERIFICATION in Vercel to the token Google gives.
+  verification: { google: process.env.NEXT_PUBLIC_GOOGLE_SITE_VERIFICATION },
   openGraph: {
     type: "website",
     siteName: "Handout",
