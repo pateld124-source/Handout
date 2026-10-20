@@ -138,10 +138,10 @@ export default function LandingPage() {
             (Replaces the old absolutely-positioned Scroll cue, which overlapped
             the CTA buttons once they wrapped.) */}
         <div style={{ display:'flex', flexWrap:'wrap', gap:10, marginTop:40, position:'relative', zIndex:2, animation:'fadeUpIn 0.9s ease 1.2s both' }}>
-          {['🏠 Roommates & sublets','📚 Marketplace','💚 Campus Connect','🎉 Events','⭐ Find your people'].map(chip => (
-            <span key={chip} style={{ display:'inline-flex', alignItems:'center', gap:7, background:'#ffffff', border:'1px solid var(--border)', borderRadius:100, padding:'9px 16px', fontSize:13.5, fontWeight:600, color:'var(--light)' }}>
+          {[['🏠 Roommates & sublets','/roommates'],['📚 Marketplace','/marketplace'],['💚 Campus Connect','/campus-connect'],['🎉 Events','/events'],['⭐ Find your people','/find-your-people']].map(([chip, href]) => (
+            <Link key={chip} href={href} style={{ display:'inline-flex', alignItems:'center', gap:7, background:'#ffffff', border:'1px solid var(--border)', borderRadius:100, padding:'9px 16px', fontSize:13.5, fontWeight:600, color:'var(--light)', textDecoration:'none' }}>
               {chip}
-            </span>
+            </Link>
           ))}
         </div>
       </section>
