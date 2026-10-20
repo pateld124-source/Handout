@@ -65,7 +65,7 @@ export default function FeaturePage({ f }: { f: Feature }) {
 
       <section style={{ maxWidth: 860, margin: '0 auto', padding: '16px 24px 40px' }}>
         <h2 style={{ fontSize: 22, fontWeight: 800, margin: '0 0 14px' }}>How it works</h2>
-        <ol style={{ paddingLeft: 22, fontSize: 15.5, lineHeight: 1.9, color: 'var(--light, #4C6157)', margin: 0 }}>
+        <ol style={{ listStyle: 'decimal', paddingLeft: 22, fontSize: 15.5, lineHeight: 1.9, color: 'var(--light, #4C6157)', margin: 0 }}>
           {f.steps.map((s) => <li key={s}>{s}</li>)}
         </ol>
       </section>
